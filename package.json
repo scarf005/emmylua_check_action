@@ -1,0 +1,9 @@
+{
+  "name": "emmylua-check-action",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "test:syntax": "node --check dist/index.js"
+  }
+}

@@ -1,0 +1,69 @@
+name: EmmyLua Check
+description: Download emmylua_check from releases and annotate diagnostics.
+author: scarf
+
+inputs:
+  version:
+    description: EmmyLua Analyzer Rust release tag to use. Use latest for the latest release.
+    required: false
+    default: latest
+  repository:
+    description: GitHub repository that publishes emmylua_check release assets.
+    required: false
+    default: EmmyLuaLs/emmylua-analyzer-rust
+  asset:
+    description: Release asset name to download. Defaults to the current runner OS and architecture.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory to run emmylua_check in.
+    required: false
+    default: .
+  args:
+    description: Arguments passed to emmylua_check. Supports shell-like text or a JSON string array. When set, replaces workspace/config/ignore/warnings-as-errors/verbose inputs.
+    required: false
+    default: ""
+  workspace:
+    description: Newline-separated workspace paths passed to emmylua_check.
+    required: false
+    default: .
+  config:
+    description: Newline-separated config file paths passed with --config.
+    required: false
+    default: ""
+  ignore:
+    description: Comma-separated ignore globs passed with --ignore.
+    required: false
+    default: ""
+  warnings-as-errors:
+    description: Treat warnings as errors.
+    required: false
+    default: "false"
+  annotate:
+    description: Emit GitHub annotations for diagnostics.
+    required: false
+    default: "true"
+  verbose:
+    description: Run emmylua_check with --verbose.
+    required: false
+    default: "false"
+  token:
+    description: GitHub token for release API requests.
+    required: false
+    default: ""
+
+outputs:
+  version:
+    description: Resolved release tag.
+  asset:
+    description: Downloaded release asset name.
+  diagnostics:
+    description: Total number of diagnostics.
+  errors:
+    description: Number of error diagnostics.
+  warnings:
+    description: Number of warning diagnostics.
+
+runs:
+  using: node20
+  main: dist/index.js
