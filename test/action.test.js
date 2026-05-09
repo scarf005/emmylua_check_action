@@ -9,9 +9,8 @@ const root = path.resolve(__dirname, "..");
 const action = path.join(root, "dist", "index.js");
 const version = "0.22.0";
 
-const writeFile = (filePath, content) => {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, content);
+const copyFixture = (name, workspace) => {
+  fs.cpSync(path.join(__dirname, "fixtures", name), workspace, { recursive: true });
 };
 
 const runAction = ({ workspace, inputs = {} }) => new Promise((resolve) => {
@@ -35,7 +34,7 @@ const runAction = ({ workspace, inputs = {} }) => new Promise((resolve) => {
 
 test("passes on a clean workspace without host tar", async () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-clean-"));
-  writeFile(path.join(workspace, "main.lua"), "local x = 1\nprint(x)\n");
+  copyFixture("clean", workspace);
 
   const result = await runAction({ workspace, inputs: { workspace: "." } });
 
@@ -45,8 +44,7 @@ test("passes on a clean workspace without host tar", async () => {
 
 test("emits annotations from config severities", async () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-diagnostics-"));
-  writeFile(path.join(workspace, ".emmyrc.json"), JSON.stringify({ diagnostics: { severity: { "undefined-global": "error", "assign-type-mismatch": "warning" } } }));
-  writeFile(path.join(workspace, "main.lua"), "---@type string\nlocal x = 1\nprint(y)\n");
+  copyFixture("diagnostics", workspace);
 
   const result = await runAction({ workspace, inputs: { workspace: "." } });
 
@@ -57,7 +55,7 @@ test("emits annotations from config severities", async () => {
 
 test("accepts raw emmylua_check args", async () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-args-"));
-  writeFile(path.join(workspace, "src", "main.lua"), "local x = 1\nprint(x)\n");
+  copyFixture("args", workspace);
 
   const result = await runAction({ workspace, inputs: { args: JSON.stringify(["src"]) } });
 
