@@ -6,25 +6,22 @@ const { spawn } = require("node:child_process");
 const test = require("node:test");
 
 const root = path.resolve(__dirname, "..");
-const action = path.join(root, "dist", "index.js");
+const installer = path.join(root, "scripts", "install.sh");
 const version = "0.22.0";
 
 const copyFixture = (name, workspace) => {
   fs.cpSync(path.join(__dirname, "fixtures", name), workspace, { recursive: true });
 };
 
-const runAction = ({ workspace, inputs = {} }) => new Promise((resolve) => {
-  const env = {
-    ...process.env,
-    GITHUB_WORKSPACE: workspace,
-    RUNNER_TEMP: fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-action-runner-")),
-    PATH: path.dirname(process.execPath),
-    INPUT_VERSION: version,
-    INPUT_WORKING_DIRECTORY: ".",
-    ...Object.fromEntries(Object.entries(inputs).map(([key, value]) => [`INPUT_${key.toUpperCase().replace(/-/g, "_")}`, value])),
-  };
+const parseOutputFile = (file) => Object.fromEntries(
+  fs.readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((line) => {
+    const index = line.indexOf("=");
+    return [line.slice(0, index), line.slice(index + 1)];
+  }),
+);
 
-  const child = spawn(process.execPath, [action], { env, cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+const run = ({ command, args, env = {}, cwd = root }) => new Promise((resolve) => {
+  const child = spawn(command, args, { env: { ...process.env, ...env }, cwd, stdio: ["ignore", "pipe", "pipe"] });
   let stdout = "";
   let stderr = "";
   child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
@@ -32,35 +29,48 @@ const runAction = ({ workspace, inputs = {} }) => new Promise((resolve) => {
   child.on("close", (code) => resolve({ code, stdout, stderr }));
 });
 
-test("passes on a clean workspace without host tar", async () => {
+const runInstall = async () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-action-test-"));
+  const outputFile = path.join(temp, "output");
+  const pathFile = path.join(temp, "path");
+  const result = await run({
+    command: "bash",
+    args: [installer],
+    env: {
+      GITHUB_OUTPUT: outputFile,
+      GITHUB_PATH: pathFile,
+      RUNNER_TEMP: temp,
+      INPUT_VERSION: version,
+    },
+  });
+
+  return { ...result, outputs: parseOutputFile(outputFile), pathFile };
+};
+
+test("installs emmylua_check for Ubuntu runners", async (t) => {
+  if (process.platform !== "linux") {
+    t.skip("installer only supports Linux");
+    return;
+  }
+
+  const result = await runInstall();
+
+  assert.equal(result.code, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(result.outputs.version, version);
+  assert.match(result.outputs.asset, /^emmylua_check-linux-(x64|aarch64|arm64).*\.tar\.gz$/);
+  assert.ok(fs.existsSync(result.outputs.path));
+  assert.match(fs.readFileSync(result.pathFile, "utf8"), new RegExp(`${path.dirname(result.outputs.path)}\\n`));
+
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-clean-"));
+  const jsonPath = path.join(workspace, "diagnostics.json");
   copyFixture("clean", workspace);
 
-  const result = await runAction({ workspace, inputs: { workspace: "." } });
+  const check = await run({
+    command: result.outputs.path,
+    args: ["--output-format", "json", "--output", jsonPath, "."],
+    cwd: workspace,
+  });
 
-  assert.equal(result.code, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /emmylua_check reported 0 diagnostics/);
-});
-
-test("emits annotations from config severities", async () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-diagnostics-"));
-  copyFixture("diagnostics", workspace);
-
-  const result = await runAction({ workspace, inputs: { workspace: "." } });
-
-  assert.equal(result.code, 1);
-  assert.match(result.stdout, /::error file=main\.lua,line=3,col=7,endLine=3,endColumn=8,title=undefined-global::undefined global variable: y/);
-  assert.match(result.stdout, /::warning file=main\.lua,line=2,col=7,endLine=2,endColumn=8,title=assign-type-mismatch::Cannot assign `integer` to `string`\./);
-});
-
-test("accepts raw emmylua_check args", async () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-args-"));
-  copyFixture("args", workspace);
-
-  const result = await runAction({ workspace, inputs: { args: JSON.stringify(["src"]) } });
-
-  assert.equal(result.code, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /Running emmylua_check "--output-format" "json" "--output"/);
-  assert.match(result.stdout, /"src"/);
-  assert.match(result.stdout, /emmylua_check reported 0 diagnostics/);
+  assert.equal(check.code, 0, `${check.stdout}\n${check.stderr}`);
+  assert.ok(fs.existsSync(jsonPath));
 });

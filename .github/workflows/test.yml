@@ -11,5 +11,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - run: node --check dist/index.js
-      - run: node --test
+      - run: bash -n scripts/install.sh
+      - run: shellcheck scripts/install.sh
+      - run: npm test

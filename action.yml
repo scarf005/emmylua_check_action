@@ -1,5 +1,6 @@
-name: EmmyLua Check
-description: Download emmylua_check from releases and annotate diagnostics.
+name: Setup EmmyLua Check
+
+description: Download emmylua_check for Ubuntu runners and add it to PATH.
 author: scarf
 
 inputs:
@@ -12,41 +13,9 @@ inputs:
     required: false
     default: EmmyLuaLs/emmylua-analyzer-rust
   asset:
-    description: Release asset name to download. Defaults to the current runner OS and architecture.
+    description: Ubuntu release asset name to download. Defaults to the current Ubuntu runner architecture.
     required: false
     default: ""
-  working-directory:
-    description: Directory to run emmylua_check in.
-    required: false
-    default: .
-  args:
-    description: Arguments passed to emmylua_check. Supports shell-like text or a JSON string array. When set, replaces workspace/config/ignore/warnings-as-errors/verbose inputs.
-    required: false
-    default: ""
-  workspace:
-    description: Newline-separated workspace paths passed to emmylua_check.
-    required: false
-    default: .
-  config:
-    description: Newline-separated config file paths passed with --config.
-    required: false
-    default: ""
-  ignore:
-    description: Comma-separated ignore globs passed with --ignore.
-    required: false
-    default: ""
-  warnings-as-errors:
-    description: Treat warnings as errors.
-    required: false
-    default: "false"
-  annotate:
-    description: Emit GitHub annotations for diagnostics.
-    required: false
-    default: "true"
-  verbose:
-    description: Run emmylua_check with --verbose.
-    required: false
-    default: "false"
   token:
     description: GitHub token for release API requests.
     required: false
@@ -55,15 +24,22 @@ inputs:
 outputs:
   version:
     description: Resolved release tag.
+    value: ${{ steps.install.outputs.version }}
   asset:
     description: Downloaded release asset name.
-  diagnostics:
-    description: Total number of diagnostics.
-  errors:
-    description: Number of error diagnostics.
-  warnings:
-    description: Number of warning diagnostics.
+    value: ${{ steps.install.outputs.asset }}
+  path:
+    description: Installed emmylua_check path.
+    value: ${{ steps.install.outputs.path }}
 
 runs:
-  using: node20
-  main: dist/index.js
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/scripts/install.sh"
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_ASSET: ${{ inputs.asset }}
+        INPUT_TOKEN: ${{ inputs.token }}

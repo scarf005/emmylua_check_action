@@ -4,6 +4,6 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "test:syntax": "node --check dist/index.js"
+    "test:shell": "bash -n scripts/install.sh"
   }
 }
