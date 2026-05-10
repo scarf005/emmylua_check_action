@@ -117,6 +117,83 @@ binary="$(find "$install_dir" -type f -name emmylua_check -print -quit)"
 [[ -n "$binary" ]] || error 'emmylua_check binary was not found in the release asset.'
 chmod +x "$binary"
 binary_dir="$(dirname "$binary")"
+real_binary="$binary.real"
+mv "$binary" "$real_binary"
+{
+  printf '#!/usr/bin/env bash\nset -euo pipefail\nreal_binary=%q\n' "$real_binary"
+  cat <<'WRAPPER'
+
+output_format=text
+expect_value=
+workspaces=()
+
+for arg in "$@"; do
+  if [[ -n "$expect_value" ]]; then
+    if [[ "$expect_value" == output_format ]]; then
+      output_format="$arg"
+    fi
+    expect_value=
+    continue
+  fi
+
+  case "$arg" in
+    --output-format=*) output_format="${arg#*=}" ;;
+    -f=*) output_format="${arg#*=}" ;;
+    --output-format|-f) expect_value=output_format ;;
+    --config|-c|--ignore|-i|--output) expect_value=skip ;;
+    --config=*|--ignore=*|--output=*|--warnings-as-errors|--verbose|-h|--help|-V|--version) ;;
+    -*) ;;
+    *) workspaces+=("$arg") ;;
+  esac
+done
+
+if [[ "$output_format" != text || -z "${GITHUB_ACTIONS:-}" ]]; then
+  exec "$real_binary" "$@"
+fi
+
+if [[ "${#workspaces[@]}" -eq 0 ]]; then
+  workspaces=(.)
+fi
+
+rewrite_location() {
+  local line="$1"
+  local prefix file line_number column workspace candidate display
+
+  if [[ "$line" =~ ^([[:space:]]*--\>[[:space:]]*)([^:]*):([0-9]+):([0-9]+)$ ]]; then
+    prefix="${BASH_REMATCH[1]}"
+    file="${BASH_REMATCH[2]}"
+    line_number="${BASH_REMATCH[3]}"
+    column="${BASH_REMATCH[4]}"
+
+    if [[ -n "$file" && "$file" != /* ]]; then
+      for workspace in "${workspaces[@]}"; do
+        candidate="$workspace/$file"
+        if [[ -e "$candidate" ]]; then
+          if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
+            display="$(realpath --relative-to="$GITHUB_WORKSPACE" "$candidate" 2>/dev/null || realpath "$candidate")"
+          else
+            display="$(realpath --relative-to="$PWD" "$candidate" 2>/dev/null || printf '%s' "$candidate")"
+          fi
+          printf '%s%s:%s:%s\n' "$prefix" "$display" "$line_number" "$column"
+          return
+        fi
+      done
+    fi
+  fi
+
+  printf '%s\n' "$line"
+}
+
+set +e
+"$real_binary" "$@" 2>&1 | while IFS= read -r line || [[ -n "$line" ]]; do
+  rewrite_location "$line"
+done
+code="${PIPESTATUS[0]}"
+set -e
+exit "$code"
+WRAPPER
+} >"$binary"
+chmod +x "$binary"
 
 if [[ -n "${GITHUB_PATH:-}" ]]; then
   printf '%s\n' "$binary_dir" >>"$GITHUB_PATH"
