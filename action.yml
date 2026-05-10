@@ -2,6 +2,9 @@ name: Setup EmmyLua Check
 
 description: Download emmylua_check for Ubuntu runners, add it to PATH, and register diagnostics annotations.
 author: scarf
+branding:
+  icon: check-circle
+  color: blue
 
 inputs:
   version:
