@@ -1,0 +1,2 @@
+---@class Config
+---@field port integer
