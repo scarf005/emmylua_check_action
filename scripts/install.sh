@@ -122,6 +122,10 @@ if [[ -n "${GITHUB_PATH:-}" ]]; then
   printf '%s\n' "$binary_dir" >>"$GITHUB_PATH"
 fi
 
+if [[ -n "${GITHUB_ACTIONS:-}" && -n "${GITHUB_ACTION_PATH:-}" ]]; then
+  printf '::add-matcher::%s/matcher.json\n' "$GITHUB_ACTION_PATH"
+fi
+
 set_output version "$resolved_version"
 set_output asset "$asset"
 set_output path "$binary"

@@ -1,6 +1,6 @@
 # Setup EmmyLua Check Action
 
-GitHub Action for downloading `emmylua_check` from [EmmyLua Analyzer Rust](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) on Ubuntu runners and adding it to `PATH`.
+GitHub Action for downloading `emmylua_check` from [EmmyLua Analyzer Rust](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) on Ubuntu runners, adding it to `PATH`, and registering a GitHub problem matcher for text diagnostics.
 
 Supports `ubuntu-latest` and `ubuntu-slim`.
 
@@ -39,4 +39,4 @@ jobs:
 
 ## Notes
 
-This action only installs `emmylua_check`. Run `emmylua_check` in a later step with the arguments you want.
+This action installs `emmylua_check` and registers a problem matcher. Run `emmylua_check` in a later step with the arguments you want; text diagnostics are annotated automatically.

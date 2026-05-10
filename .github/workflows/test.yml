@@ -17,4 +17,17 @@ jobs:
         uses: ./
         with: { version: 0.22.0 }
       - run: test -x "${{ steps.setup.outputs.path }}" && emmylua_check --version
+      - name: Verify problem matcher
+        shell: bash
+        run: |
+          mkdir -p .tmp-reporter
+          cat >.tmp-reporter/.emmyrc.json <<'JSON'
+          {"diagnostics":{"severity":{"assign-type-mismatch":"warning"}}}
+          JSON
+          cat >.tmp-reporter/main.lua <<'LUA'
+          ---@type string
+          local value = 1
+          print(value)
+          LUA
+          emmylua_check .tmp-reporter
       - run: npm test

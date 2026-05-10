@@ -111,6 +111,8 @@ const runInstall = async () => {
     command: "bash",
     args: [installer],
     env: {
+      GITHUB_ACTIONS: "true",
+      GITHUB_ACTION_PATH: root,
       GITHUB_OUTPUT: outputFile,
       GITHUB_PATH: pathFile,
       RUNNER_TEMP: temp,
@@ -124,6 +126,7 @@ const runInstall = async () => {
   assert.match(outputs.asset, /^emmylua_check-linux-(x64|aarch64|arm64).*\.tar\.gz$/);
   assert.ok(fs.existsSync(outputs.path));
   assert.match(fs.readFileSync(pathFile, "utf8"), new RegExp(`${path.dirname(outputs.path)}\\n`));
+  assert.match(result.stdout, /::add-matcher::.*matcher\.json/);
   return outputs.path;
 };
 
@@ -156,6 +159,31 @@ test("has 10 diagnostic Lua fixture cases", () => {
     const files = fs.readdirSync(path.join(casesRoot, fixture)).filter((name) => name.endsWith(".lua"));
     assert.ok(files.length > 0, `${fixture} should contain Lua files`);
   }
+});
+
+test("problem matcher captures emmylua_check text diagnostics", async () => {
+  const binary = await resolveEmmyluaCheck();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "emmylua-check-matcher-"));
+  copyFixture({ fixture: "invalid-local-assignment", workspace });
+
+  const result = await run({ command: binary, args: ["."], cwd: workspace });
+  const matcher = JSON.parse(fs.readFileSync(path.join(root, "matcher.json"), "utf8")).problemMatcher[0];
+  const [diagnosticPattern, locationPattern] = matcher.pattern.map(({ regexp }) => new RegExp(regexp));
+  const lines = `${result.stdout}\n${result.stderr}`.split(/\r?\n/);
+  const matched = lines.flatMap((line, index) => {
+    const diagnostic = diagnosticPattern.exec(line);
+    const location = locationPattern.exec(lines[index + 1] || "");
+    return diagnostic && location ? [{ diagnostic, location }] : [];
+  })[0];
+
+  assert.equal(result.code, 1, `${result.stdout}\n${result.stderr}`);
+  assert.ok(matched, `${result.stdout}\n${result.stderr}`);
+  assert.equal(matched.diagnostic[1], "error");
+  assert.match(matched.diagnostic[2], /Cannot assign `integer` to `string`/);
+  assert.equal(matched.diagnostic[3], "assign-type-mismatch");
+  assert.equal(matched.location[1], "main.lua");
+  assert.equal(matched.location[2], "2");
+  assert.equal(matched.location[3], "7");
 });
 
 for (const item of cases) {
