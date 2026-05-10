@@ -163,40 +163,32 @@ test("has 10 diagnostic Lua fixture cases", () => {
 
 test("problem matcher captures emmylua_check text diagnostics", async () => {
   const binary = await resolveEmmyluaCheck();
-  const workspace = fs.mkdtempSync(path.join(root, ".tmp-matcher-"));
-  const workspaceArg = path.basename(workspace);
-  const expectedFile = `${workspaceArg}/main.lua`;
+  const fixture = "test/fixtures/lua-cases/invalid-local-assignment";
+  const expectedFile = `${fixture}/main.lua`;
+  const result = await run({
+    command: binary,
+    args: [fixture],
+    env: { GITHUB_ACTIONS: "true", GITHUB_WORKSPACE: root },
+    cwd: root,
+  });
+  const matcher = JSON.parse(fs.readFileSync(path.join(root, "matcher.json"), "utf8")).problemMatcher[0];
+  const [diagnosticPattern, locationPattern] = matcher.pattern.map(({ regexp }) => new RegExp(regexp));
+  const lines = `${result.stdout}\n${result.stderr}`.split(/\r?\n/);
+  const matched = lines.flatMap((line, index) => {
+    const diagnostic = diagnosticPattern.exec(line);
+    const location = locationPattern.exec(lines[index + 1] || "");
+    return diagnostic && location ? [{ diagnostic, location }] : [];
+  })[0];
 
-  try {
-    copyFixture({ fixture: "invalid-local-assignment", workspace });
-
-    const result = await run({
-      command: binary,
-      args: [workspaceArg],
-      env: { GITHUB_ACTIONS: "true", GITHUB_WORKSPACE: root },
-      cwd: root,
-    });
-    const matcher = JSON.parse(fs.readFileSync(path.join(root, "matcher.json"), "utf8")).problemMatcher[0];
-    const [diagnosticPattern, locationPattern] = matcher.pattern.map(({ regexp }) => new RegExp(regexp));
-    const lines = `${result.stdout}\n${result.stderr}`.split(/\r?\n/);
-    const matched = lines.flatMap((line, index) => {
-      const diagnostic = diagnosticPattern.exec(line);
-      const location = locationPattern.exec(lines[index + 1] || "");
-      return diagnostic && location ? [{ diagnostic, location }] : [];
-    })[0];
-
-    assert.equal(result.code, 1, `${result.stdout}\n${result.stderr}`);
-    assert.ok(matched, `${result.stdout}\n${result.stderr}`);
-    assert.match(`${result.stdout}\n${result.stderr}`, new RegExp(`--> ${expectedFile}:2:7`));
-    assert.equal(matched.diagnostic[1], "error");
-    assert.match(matched.diagnostic[2], /Cannot assign `integer` to `string`/);
-    assert.equal(matched.diagnostic[3], "assign-type-mismatch");
-    assert.equal(matched.location[1], expectedFile);
-    assert.equal(matched.location[2], "2");
-    assert.equal(matched.location[3], "7");
-  } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
-  }
+  assert.equal(result.code, 0, `${result.stdout}\n${result.stderr}`);
+  assert.ok(matched, `${result.stdout}\n${result.stderr}`);
+  assert.match(`${result.stdout}\n${result.stderr}`, new RegExp(`--> ${expectedFile}:2:7`));
+  assert.equal(matched.diagnostic[1], "warning");
+  assert.match(matched.diagnostic[2], /Cannot assign `integer` to `string`/);
+  assert.equal(matched.diagnostic[3], "assign-type-mismatch");
+  assert.equal(matched.location[1], expectedFile);
+  assert.equal(matched.location[2], "2");
+  assert.equal(matched.location[3], "7");
 });
 
 for (const item of cases) {

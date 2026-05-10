@@ -20,16 +20,7 @@ jobs:
       - name: Verify problem matcher
         shell: bash
         run: |
-          mkdir -p .tmp-reporter
-          cat >.tmp-reporter/.emmyrc.json <<'JSON'
-          {"diagnostics":{"severity":{"assign-type-mismatch":"warning"}}}
-          JSON
-          cat >.tmp-reporter/main.lua <<'LUA'
-          ---@type string
-          local value = 1
-          print(value)
-          LUA
-          output="$(emmylua_check .tmp-reporter)"
+          output="$(emmylua_check test/fixtures/lua-cases/invalid-local-assignment)"
           printf '%s\n' "$output"
-          grep -F -- '--> .tmp-reporter/main.lua:2:7' <<<"$output"
+          grep -F -- '--> test/fixtures/lua-cases/invalid-local-assignment/main.lua:2:7' <<<"$output"
       - run: npm test
