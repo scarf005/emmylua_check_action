@@ -29,5 +29,7 @@ jobs:
           local value = 1
           print(value)
           LUA
-          emmylua_check .tmp-reporter
+          output="$(emmylua_check .tmp-reporter)"
+          printf '%s\n' "$output"
+          grep -F -- '--> .tmp-reporter/main.lua:2:7' <<<"$output"
       - run: npm test
