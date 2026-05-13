@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - uses: actions/checkout@v4
-      - uses: owner/emmylua_check_action@v1
+      - uses: scarf005/emmylua_check_action@v1
       - run: emmylua_check --config .emmyrc.json .
 ```
 
